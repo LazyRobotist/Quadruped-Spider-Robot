@@ -1,0 +1,264 @@
+#include <Servo.h>
+
+Servo servo[4][2]; // 4 legs, each has 2 servos (hip and knee)
+const int servoPin[4][2] = { {2,3}, {4,5}, {7,8}, {9,10} };
+
+// === 2. Define the neutral (rest) positions ===
+const int neutral[4][2] = {
+  {90, 130}, // leg 0
+  {90, 45},   // leg 1
+  {90, 45},   // leg 2
+  {90, 130}  // leg 3
+};
+int standPose[4][2] = {
+  {90, 130}, {110, 45}, {70, 45}, {90, 130}};
+
+
+void setup() {
+  Serial.begin(9600);
+
+  for (int i = 0; i < 4; i++) {
+    for (int j = 0; j < 2; j++) {
+      servo[i][j].attach(servoPin[i][j]);
+      servo[i][j].write(neutral[i][j]);
+    }
+  } 
+  
+  delay(1000); 
+}
+
+
+void moveAllSmooth(int start[4][2], int end[4][2], int steps, int delayTime) {
+  for (int step = 0; step <= steps; step++) {
+    for (int leg = 0; leg < 4; leg++) {
+      for (int joint = 0; joint < 2; joint++) {
+        int angle = map(step, 0, steps, start[leg][joint], end[leg][joint]);
+        servo[leg][joint].write(angle);
+      }
+    }
+    delay(delayTime);
+  }
+}
+void smoothMove(Servo &servo, int start, int end, int speedDelay) {
+  int step = (start < end) ? 1 : -1; // direction
+  for (int pos = start; pos != end; pos += step) {
+    servo.write(pos);
+    delay(speedDelay); // smaller = faster
+  }
+  servo.write(end); // make sure it lands exactly
+}
+
+
+int step1Pose[4][2] = {
+  {90, 100}, // leg 0 (front-left) lifted
+  {110, 45},   // leg 1 steady
+  {20, 45},   // leg 2 steady
+  {70, 120}  // leg 3 (back-right) crouched
+};
+
+int step2Pose[4][2] = {
+  {20, 130}, // leg 0 (front-left) lifted
+  {90, 45},   // leg 1 steady
+  {110, 30},   // leg 2 steady
+  {90, 145}  // leg 3 (back-right) crouched
+};
+
+int step3Pose[4][2] = {
+  {20, 130},
+  {90, 60},   
+  {90, 60},   
+  {170, 130}
+};
+int step4Pose[4][2] = {
+  {70, 130},
+  {160, 60},   
+  {90, 60},   
+  {70, 130}
+};
+int step5Pose[4][2] = {
+  {90, 145},
+  {170, 30},   
+  {90, 30},   
+  {90, 145}
+};
+int step6Pose[4][2] = {
+  {155, 135},
+  {65, 40},   
+  {25, 40}, 
+  {125, 135}
+};
+
+
+void walk(int steps = 50, int delayTime = 15) {
+  moveAllSmooth(standPose, step1Pose, steps, delayTime);
+  moveAllSmooth(step1Pose, step2Pose, steps, delayTime);
+  moveAllSmooth(step2Pose, step3Pose, steps, delayTime);
+  
+  moveAllSmooth(step3Pose, step4Pose, steps, delayTime);
+  moveAllSmooth(step4Pose, standPose, steps, delayTime);
+ 
+}
+
+void bounce() {
+  int steps = 60;       // number of smooth steps for each major transition
+  int delayTime = 10;   // delay between steps (controls speed)
+
+  // 1) current natural start (knees)
+  int startLeg[4] = {
+    standPose[0][1],
+    standPose[1][1],
+    standPose[2][1],
+    standPose[3][1]
+  };
+
+  // 2) original "low" and "up" values from your original bounce
+  int lowLeg[4]  = {180, 0, 0, 180};   // the old starting low values
+  int upLeg[4]   = {100, 80, 80, 100}; // the old "up" values
+
+  // --- A: Smoothly move from current natural to the original low (avoid snap) ---
+  for (int step = 0; step <= steps; step++) {
+    for (int i = 0; i < 4; i++) {
+      int angle = map(step, 0, steps, startLeg[i], lowLeg[i]);
+      servo[i][1].write(angle);
+    }
+    delay(delayTime);
+  }
+
+  // --- B: Original upward motion (low -> up) ---
+  for (int step = 0; step <= steps; step++) {
+    int leg0 = map(step, 0, steps, lowLeg[0], upLeg[0]);
+    int leg1 = map(step, 0, steps, lowLeg[1], upLeg[1]);
+    int leg2 = map(step, 0, steps, lowLeg[2], upLeg[2]);
+    int leg3 = map(step, 0, steps, lowLeg[3], upLeg[3]);
+
+    servo[0][1].write(leg0);
+    servo[1][1].write(leg1);
+    servo[2][1].write(leg2);
+    servo[3][1].write(leg3);
+
+    delay(delayTime);
+  }
+
+  // --- C: Original downward motion (up -> low) ---
+  for (int step = 0; step <= steps; step++) {
+    int leg0 = map(step, 0, steps, upLeg[0], lowLeg[0]);
+    int leg1 = map(step, 0, steps, upLeg[1], lowLeg[1]);
+    int leg2 = map(step, 0, steps, upLeg[2], lowLeg[2]);
+    int leg3 = map(step, 0, steps, upLeg[3], lowLeg[3]);
+
+    servo[0][1].write(leg0);
+    servo[1][1].write(leg1);
+    servo[2][1].write(leg2);
+    servo[3][1].write(leg3);
+
+    delay(delayTime);
+  }
+
+  // --- D: Smoothly return from low back to natural standPose ---
+  for (int step = 0; step <= steps; step++) {
+    for (int i = 0; i < 4; i++) {
+      int angle = map(step, 0, steps, lowLeg[i], startLeg[i]);
+      servo[i][1].write(angle);
+    }
+    delay(delayTime);
+  }
+}
+
+
+
+void catStretch(int steps = 80, int delayTime = 15, int holdSteps = 200) {
+  // Target stretch pose (hip, knee)
+  int stretchPose[4][2] = {
+    {45, 110},   // leg 0 (front-left)
+    {135, 70},   // leg 1 (front-right)
+    {135, 0},    // leg 2 (back-left)
+    {45, 180}    // leg 3 (back-right)
+  };
+
+  // === A: Move slowly from standPose → stretchPose ===
+  for (int step = 0; step <= steps; step++) {
+    for (int leg = 0; leg < 4; leg++) {
+      for (int joint = 0; joint < 2; joint++) {
+        int angle = map(step, 0, steps, standPose[leg][joint], stretchPose[leg][joint]);
+        servo[leg][joint].write(angle);
+      }
+    }
+    delay(delayTime);
+  }
+
+  // === B: Hold stretched pose briefly (without blocking long delay) ===
+  for (int hold = 0; hold < holdSteps; hold++) {
+    for (int leg = 0; leg < 4; leg++) {
+      for (int joint = 0; joint < 2; joint++) {
+        servo[leg][joint].write(stretchPose[leg][joint]);
+      }
+    }
+    delay(delayTime);
+  }
+
+  // === C: Move slowly back from stretchPose → standPose ===
+  for (int step = 0; step <= steps; step++) {
+    for (int leg = 0; leg < 4; leg++) {
+      for (int joint = 0; joint < 2; joint++) {
+        int angle = map(step, 0, steps, stretchPose[leg][joint], standPose[leg][joint]);
+        servo[leg][joint].write(angle);
+      }
+    }
+    delay(delayTime);
+  }
+}
+
+
+
+
+void handshake(int steps = 50, int delayTime = 10) {
+  // start pose
+  int poseStart[4][2] = {
+    {90, 90},  
+    {110, 30},
+    {70, 30},
+    {90, 110}
+  };
+
+  // end pose (leg 0 lifted up, leg 3 crouched slightly)
+  int poseEnd[4][2] = {
+    {90, 5},   // leg 0 knee up (smaller angle = higher)
+    {110, 30},
+    {70, 30},
+    {90, 110}   // leg 3 knee down (for balance)
+  };
+
+  moveAllSmooth(poseStart, poseEnd, steps, delayTime);
+  moveAllSmooth(poseEnd, poseStart, steps, delayTime);
+  
+}
+
+int stepfront[4][2] = {
+  {90, 180},
+  {90, 0},   
+  {135, 90},   
+  {45, 90}
+};
+
+void ccp(){
+  walk();
+  walk();
+  handshake();
+  handshake();
+  handshake();
+  handshake();
+  moveAllSmooth(standPose, stepfront, 40, 20);
+  moveAllSmooth(stepfront, standPose, 40, 20);
+  
+  delay(500);
+  catStretch();
+  bounce();
+
+
+  
+  }
+                  
+void loop() {
+ ccp();
+ 
+}
